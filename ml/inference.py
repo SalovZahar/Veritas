@@ -12,10 +12,10 @@ import torch.nn.functional as F
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 # Пути
-BASE_DIR    = Path(__file__).resolve().parent.parent
-MODELS_DIR  = BASE_DIR / "models"
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODELS_DIR = BASE_DIR / "models"
 CONFIG_PATH = MODELS_DIR / "config.json"
-MODEL_PATH  = MODELS_DIR / "model.pt"
+MODEL_PATH = MODELS_DIR / "model.pt"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -30,13 +30,13 @@ PRETRAINED_MODEL_NAME: str = cfg["pretrained_model_name"]
 LOCAL_MODEL_DIR = BASE_DIR / "models" / "roberta-local"
 if LOCAL_MODEL_DIR.exists():
     PRETRAINED_MODEL_NAME = str(LOCAL_MODEL_DIR)
-NUM_LABELS: int            = cfg["num_labels"]
-MAX_LENGTH: int            = cfg.get("max_length", 256)
-ID2LABEL: dict             = {int(k): v for k, v in cfg["id2label"].items()}
+NUM_LABELS: int = cfg["num_labels"]
+MAX_LENGTH: int = cfg.get("max_length", 256)
+ID2LABEL: dict = {int(k): v for k, v in cfg["id2label"].items()}
 # ID2LABEL = {0: "fake", 1: "real"}
 
 tokenizer = AutoTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)
-model     = AutoModelForSequenceClassification.from_pretrained(
+model = AutoModelForSequenceClassification.from_pretrained(
     PRETRAINED_MODEL_NAME,
     num_labels=NUM_LABELS,
 ).to(DEVICE)
@@ -49,12 +49,6 @@ model.eval()
 
 def classify_text(text: str) -> dict:
     """
-    Классифицирует текст новости как фейк или достоверный.
-
-    Args:
-        text: текст статьи, минимум 10 символов
-
-    Returns:
         {
             "label":      "fake" | "real",
             "confidence": float (0.0 – 1.0),
@@ -84,9 +78,9 @@ def classify_text(text: str) -> dict:
         outputs = model(**inputs)
         probs_tensor = F.softmax(outputs.logits, dim=-1).squeeze(0)
 
-    probs     = probs_tensor.cpu().tolist()          # [p_fake, p_real]
+    probs = probs_tensor.cpu().tolist()  # [p_fake, p_real]
     class_idx = int(torch.argmax(probs_tensor).item())
-    label     = ID2LABEL[class_idx]                  # "fake" или "real"
+    label = ID2LABEL[class_idx]  # "fake" или "real"
 
     p_fake = float(probs[0])
     p_real = float(probs[1])
@@ -96,9 +90,9 @@ def classify_text(text: str) -> dict:
     confidence = float(max(probs))
 
     return {
-        "label":      label,
+        "label": label,
         "confidence": round(confidence, 4),
-        "score":      score,
+        "score": score,
         "probs": {
             "fake": round(p_fake, 4),
             "real": round(p_real, 4),

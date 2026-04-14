@@ -1,14 +1,7 @@
 """
 Оценка качества обученной модели на тестовой выборке.
 
-Считает:
-- Accuracy
-- F1 (macro)
-- Confusion matrix
-- Отчёт по каждому классу (precision, recall, f1)
-
-Запуск:
-    python ml/eval.py
+python ml/eval.py
 """
 
 from pathlib import Path
@@ -29,11 +22,11 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from dataset import FakeNewsDataset
 
 # ── Пути ──────────────────────────────────────────────────────────────────────
-BASE_DIR    = Path(__file__).resolve().parent.parent
-DATA_PATH   = BASE_DIR / "data" / "wellfake_preprocessed.csv"
-MODELS_DIR  = BASE_DIR / "models"
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_PATH = BASE_DIR / "data" / "wellfake_preprocessed.csv"
+MODELS_DIR = BASE_DIR / "models"
 CONFIG_PATH = MODELS_DIR / "config.json"
-MODEL_PATH  = MODELS_DIR / "model.pt"
+MODEL_PATH = MODELS_DIR / "model.pt"
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Используем устройство: {DEVICE}")
@@ -52,14 +45,14 @@ def main():
         cfg = json.load(f)
 
     pretrained_model_name = cfg["pretrained_model_name"]
-    num_labels            = cfg["num_labels"]
-    max_length            = cfg.get("max_length", 256)
-    id2label              = {int(k): v for k, v in cfg["id2label"].items()}
+    num_labels = cfg["num_labels"]
+    max_length = cfg.get("max_length", 256)
+    id2label = {int(k): v for k, v in cfg["id2label"].items()}
 
     # ── Загружаем модель ───────────────────────────────────────────────────────
     print(f"\nЗагружаем модель {pretrained_model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
-    model     = AutoModelForSequenceClassification.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         pretrained_model_name,
         num_labels=num_labels,
     ).to(DEVICE)
@@ -85,7 +78,7 @@ def main():
     print("\nЗапускаем предсказания на тестовой выборке...")
     with torch.no_grad():
         for step, batch in enumerate(test_loader, 1):
-            batch   = {k: v.to(DEVICE) for k, v in batch.items()}
+            batch = {k: v.to(DEVICE) for k, v in batch.items()}
             outputs = model(
                 input_ids=batch["input_ids"],
                 attention_mask=batch["attention_mask"],
@@ -98,20 +91,20 @@ def main():
             if step % 50 == 0:
                 print(f"  Обработано батчей: {step}/{len(test_loader)}")
 
-    all_preds  = np.concatenate(all_preds)
+    all_preds = np.concatenate(all_preds)
     all_labels = np.concatenate(all_labels)
 
     # ── Метрики ────────────────────────────────────────────────────────────────
-    acc      = accuracy_score(all_labels, all_preds)
+    acc = accuracy_score(all_labels, all_preds)
     macro_f1 = f1_score(all_labels, all_preds, average="macro")
-    cm       = confusion_matrix(all_labels, all_preds, labels=[0, 1])
+    cm = confusion_matrix(all_labels, all_preds, labels=[0, 1])
 
     label_names = [id2label[0], id2label[1]]  # ["fake", "real"]
 
     print("\n" + "=" * 50)
     print("РЕЗУЛЬТАТЫ НА ТЕСТОВОЙ ВЫБОРКЕ")
     print("=" * 50)
-    print(f"Accuracy:  {acc:.4f}  ({acc*100:.1f}%)")
+    print(f"Accuracy:  {acc:.4f}  ({acc * 100:.1f}%)")
     print(f"Macro F1:  {macro_f1:.4f}")
 
     print("\nConfusion matrix (строки=правда, столбцы=предсказание):")

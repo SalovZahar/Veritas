@@ -22,10 +22,11 @@ pip install transformers scikit-learn pandas numpy ddgs httpx python-dotenv
 
 ### 3. Веса модели
 
-Получить у ML-разработчика и положить в:
+Получить у ML-разработчика :
 ```
-models/model.pt       веса (~500MB)
-models/config.json  
+директорию models
+
+ссылка: 
 ```
 
 ### 4. Переменные окружения
@@ -192,8 +193,6 @@ if result["error"]:
     # LLM может быть недоступна
     pass
 ```
-
-> Время ответа: 3–10 секунд.
 
 ---
 

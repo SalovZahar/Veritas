@@ -2,12 +2,16 @@
 venv/
 __pycache__/
 *.pyc
+test_deep_analysis.py
 
 # Data
 data/
 
 # Models
 models/
+
+# Scripts
+scripts/
 
 # Env
 .env

@@ -1,8 +1,7 @@
 """
 Обучение модели roberta-base на датасете WELFake.
 
-Запуск:
-    python ml/train.py
+python ml/train.py
 """
 
 from pathlib import Path
@@ -25,19 +24,19 @@ from transformers import (
 from dataset import FakeNewsDataset
 
 # Пути
-BASE_DIR   = Path(__file__).resolve().parent.parent
-DATA_PATH  = BASE_DIR / "data" / "wellfake_preprocessed.csv"
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_PATH = BASE_DIR / "data" / "wellfake_preprocessed.csv"
 MODELS_DIR = BASE_DIR / "models"
 
 # Гиперпараметры
 PRETRAINED_MODEL_NAME = "roberta-base"
-MAX_LENGTH  = 512
-NUM_LABELS  = 2        # 0 = fake, 1 = real
+MAX_LENGTH = 512
+NUM_LABELS = 2  # 0 = fake, 1 = real
 
-BATCH_SIZE  = 16       # если не хватает памяти GPU — уменьши до 8
-LR          = 2e-5     # стандартный learning rate для fine-tuning roberta
-EPOCHS      = 4        # для roberta хватает 3-4 эпох
-WARMUP_RATIO = 0.1     # 10% шагов — разогрев learning rate
+BATCH_SIZE = 16  # если не хватает памяти GPU — уменьши до 8
+LR = 2e-5  # стандартный learning rate для fine-tuning roberta
+EPOCHS = 4  # для roberta хватает 3-4 эпох
+WARMUP_RATIO = 0.1  # 10% шагов — разогрев learning rate
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Используем устройство: {DEVICE}")
@@ -48,8 +47,8 @@ print(f"Используем устройство: {DEVICE}")
 def load_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     df = pd.read_csv(DATA_PATH)
     train_df = df[df["split"] == "train"].reset_index(drop=True)
-    val_df   = df[df["split"] == "val"].reset_index(drop=True)
-    test_df  = df[df["split"] == "test"].reset_index(drop=True)
+    val_df = df[df["split"] == "val"].reset_index(drop=True)
+    test_df = df[df["split"] == "test"].reset_index(drop=True)
     return train_df, val_df, test_df
 
 
@@ -70,7 +69,7 @@ def make_loaders(tokenizer) -> tuple[DataLoader, DataLoader, pd.DataFrame]:
     )
 
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False)
+    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False)
 
     return train_loader, val_loader, train_df
 
@@ -78,7 +77,7 @@ def make_loaders(tokenizer) -> tuple[DataLoader, DataLoader, pd.DataFrame]:
 # Веса классов (исправляем дисбаланс 54/46)
 
 def compute_weights(train_df: pd.DataFrame) -> torch.Tensor:
-    labels  = train_df["label"].values
+    labels = train_df["label"].values
     weights = compute_class_weight(
         class_weight="balanced",
         classes=np.array([0, 1]),
@@ -91,9 +90,9 @@ def compute_weights(train_df: pd.DataFrame) -> torch.Tensor:
 # Валидация
 
 def evaluate(
-    model: nn.Module,
-    loader: DataLoader,
-    loss_fn: nn.CrossEntropyLoss,
+        model: nn.Module,
+        loader: DataLoader,
+        loss_fn: nn.CrossEntropyLoss,
 ) -> dict:
     model.eval()
     all_preds, all_labels = [], []
@@ -101,7 +100,7 @@ def evaluate(
 
     with torch.no_grad():
         for batch in loader:
-            batch   = {k: v.to(DEVICE) for k, v in batch.items()}
+            batch = {k: v.to(DEVICE) for k, v in batch.items()}
             outputs = model(
                 input_ids=batch["input_ids"],
                 attention_mask=batch["attention_mask"],
@@ -113,13 +112,13 @@ def evaluate(
             all_preds.append(preds.cpu().numpy())
             all_labels.append(batch["labels"].cpu().numpy())
 
-    all_preds  = np.concatenate(all_preds)
+    all_preds = np.concatenate(all_preds)
     all_labels = np.concatenate(all_labels)
 
     return {
-        "loss":     total_loss / len(loader),
+        "loss": total_loss / len(loader),
         "accuracy": accuracy_score(all_labels, all_preds),
-        "f1":       f1_score(all_labels, all_preds, average="macro"),
+        "f1": f1_score(all_labels, all_preds, average="macro"),
     }
 
 
@@ -130,7 +129,7 @@ def train():
 
     print(f"\nЗагружаем токенизатор и модель {PRETRAINED_MODEL_NAME}...")
     tokenizer = AutoTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)
-    model     = AutoModelForSequenceClassification.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         PRETRAINED_MODEL_NAME,
         num_labels=NUM_LABELS,
     ).to(DEVICE)
@@ -143,7 +142,7 @@ def train():
     loss_fn = nn.CrossEntropyLoss(weight=class_weights)
 
     # Оптимизатор и планировщик learning rate
-    total_steps  = len(train_loader) * EPOCHS
+    total_steps = len(train_loader) * EPOCHS
     warmup_steps = int(total_steps * WARMUP_RATIO)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
@@ -153,7 +152,7 @@ def train():
         num_training_steps=total_steps,
     )
 
-    best_f1         = 0.0
+    best_f1 = 0.0
     best_model_path = MODELS_DIR / "model_best.pt"
 
     print(f"\nНачинаем обучение на {EPOCHS} эпох...\n")
@@ -183,10 +182,10 @@ def train():
 
             # Прогресс каждые 100 батчей
             if step % 100 == 0:
-                print(f"  Epoch {epoch} | step {step}/{len(train_loader)} | loss={total_loss/step:.4f}")
+                print(f"  Epoch {epoch} | step {step}/{len(train_loader)} | loss={total_loss / step:.4f}")
 
         avg_train_loss = total_loss / len(train_loader)
-        val_metrics    = evaluate(model, val_loader, loss_fn)
+        val_metrics = evaluate(model, val_loader, loss_fn)
 
         print(
             f"\nEpoch {epoch}/{EPOCHS} | "
@@ -200,7 +199,7 @@ def train():
         if val_metrics["f1"] > best_f1:
             best_f1 = val_metrics["f1"]
             torch.save(model.state_dict(), best_model_path)
-            print(f"  ✓ Новая лучшая модель сохранена (f1={best_f1:.4f})\n")
+            print(f"Новая лучшая модель сохранена (f1={best_f1:.4f})\n")
 
     # Копируем лучшую модель как основную
     shutil.copy(best_model_path, MODELS_DIR / "model.pt")
@@ -208,10 +207,10 @@ def train():
     # Сохраняем конфиг — inference.py будет читать его
     config = {
         "pretrained_model_name": PRETRAINED_MODEL_NAME,
-        "num_labels":            NUM_LABELS,
-        "max_length":            MAX_LENGTH,
-        "id2label":              {"0": "fake", "1": "real"},
-        "label2id":              {"fake": 0, "real": 1},
+        "num_labels": NUM_LABELS,
+        "max_length": MAX_LENGTH,
+        "id2label": {"0": "fake", "1": "real"},
+        "label2id": {"fake": 0, "real": 1},
     }
     with open(MODELS_DIR / "config.json", "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)

@@ -1,7 +1,6 @@
 """
 Глубокий анализ новости через LLM (OpenRouter).
 
-Использование:
     from ml.deep_analysis import deep_analyse
 
     result = deep_analyse(
@@ -20,7 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ── Настройки ──────────────────────────────────────────────────────────────────
+# Настройки
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 LLM_MODEL = "openrouter/auto"
@@ -44,11 +43,12 @@ def _format_sources(sources_result: dict) -> str:
 def _build_prompt(news_text: str, model_result: dict, sources_result: dict) -> str:
     """Собираем финальный промт."""
     sources_text = _format_sources(sources_result)
-    label        = model_result.get("label", "unknown")
-    confidence   = round(model_result.get("confidence", 0) * 100)
-    score        = model_result.get("score", 0)
+    label = model_result.get("label", "unknown")
+    confidence = round(model_result.get("confidence", 0) * 100)
+    score = model_result.get("score", 0)
 
-    return f"""Ты — эксперт по фактчекингу, журналистике и анализу дезинформации.
+    return f"""
+Ты — эксперт по фактчекингу, журналистике и анализу дезинформации.
 Твоя задача — провести глубокий анализ достоверности новости.
 
 === ДАННЫЕ ===
@@ -130,19 +130,11 @@ def _parse_llm_response(raw: str) -> dict:
 
 
 def deep_analyse(
-    news_text: str,
-    model_result: dict,
-    sources_result: dict,
+        news_text: str,
+        model_result: dict,
+        sources_result: dict,
 ) -> dict:
     """
-    Проводит глубокий анализ новости через LLM.
-
-    Args:
-        news_text:      текст статьи
-        model_result:   результат classify_text()
-        sources_result: результат find_sources()
-
-    Returns:
         {
             "verdict":    "fake | likely_fake | mixed | likely_real | real",
             "confidence": 0-100,
@@ -158,10 +150,10 @@ def deep_analyse(
         }
     """
     if not LLM_API_KEY:
-        return _error_result("LLM_API_KEY не задан в .env файле.")
+        return _error_result("LLM_API_KEY don't srt in .env file.")
 
     if not news_text or len(news_text.strip()) < 10:
-        return _error_result("Текст слишком короткий для анализа.")
+        return _error_result("Test is too short to analyze.")
 
     prompt = _build_prompt(news_text, model_result, sources_result)
 
@@ -169,18 +161,18 @@ def deep_analyse(
         response = httpx.post(
             LLM_API_URL,
             headers={
-                "Authorization":  f"Bearer {LLM_API_KEY}",
-                "Content-Type":   "application/json",
-                "HTTP-Referer":   "https://veritas-extension.local",
-                "X-Title":        "Veritas Fake News Detector",
+                "Authorization": f"Bearer {LLM_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://veritas-extension.local",
+                "X-Title": "Veritas Fake News Detector",
             },
             json={
-                "model":    LLM_MODEL,
+                "model": LLM_MODEL,
                 "messages": [
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.2,
-                "max_tokens":  1500,
+                "max_tokens": 1500,
             },
             timeout=30.0,
         )
@@ -188,21 +180,21 @@ def deep_analyse(
         data = response.json()
 
     except httpx.TimeoutException:
-        return _error_result("LLM не ответил вовремя (timeout 30s).")
+        return _error_result("LLM don't answer in time (timeout 30s).")
     except httpx.HTTPStatusError as e:
-        return _error_result(f"Ошибка API: {e.response.status_code} — {e.response.text[:200]}")
+        return _error_result(f"API error: {e.response.status_code} — {e.response.text[:200]}")
     except Exception as e:
-        return _error_result(f"Неизвестная ошибка: {str(e)}")
+        return _error_result(f"Unknown error: {str(e)}")
 
     try:
         raw_text = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError):
-        return _error_result(f"Неожиданный формат ответа: {str(data)[:200]}")
+        return _error_result(f"Unexpected response format: {str(data)[:200]}")
 
     try:
         result = _parse_llm_response(raw_text)
     except json.JSONDecodeError:
-        return _error_result(f"LLM вернул невалидный JSON: {raw_text[:200]}")
+        return _error_result(f"LLM return invalid JSON: {raw_text[:200]}")
 
     result["error"] = None
     return result
@@ -210,15 +202,15 @@ def deep_analyse(
 
 def _error_result(message: str) -> dict:
     return {
-        "verdict":        "unknown",
-        "confidence":     0,
-        "explanation":    message,
+        "verdict": "unknown",
+        "confidence": 0,
+        "explanation": message,
         "signals": {
-            "factual_issues":     [],
+            "factual_issues": [],
             "manipulation_signs": [],
-            "source_analysis":    [],
-            "contradictions":     [],
+            "source_analysis": [],
+            "contradictions": [],
         },
         "final_reasoning": "",
-        "error":           message,
+        "error": message,
     }
