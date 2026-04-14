@@ -5,7 +5,8 @@ __pycache__/
 test_deep_analysis.py
 
 # Data
-data/
+data/WELFake_Dataset.csv
+data/wellfake_preprocessed.csv
 
 # Models
 models/
