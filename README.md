@@ -194,56 +194,6 @@ if result["error"]:
 
 ---
 
-## Типичный сценарий — два эндпоинта
-
-### POST /analyze — кнопка "Проверить"
-
-```python
-@app.post("/analyze")
-def analyze(request):
-    text = request.body["text"]
-
-    try:
-        model_result   = classify_text(text)
-    except ValueError as e:
-        return {"error": str(e)}, 400
-
-    sources_result = find_sources(text)
-
-    return {
-        "label":         model_result["label"],
-        "score":         model_result["score"],
-        "confidence":    model_result["confidence"],
-        "probs":         model_result["probs"],
-        "sources":       sources_result["sources"],
-        "trusted_count": sources_result["trusted_count"],
-    }
-```
-
-### POST /analyze/deep — кнопка "Глубокий анализ"
-
-```python
-@app.post("/analyze/deep")
-def analyze_deep(request):
-    text           = request.body["text"]
-    model_result   = request.body["model_result"]
-    sources_result = request.body["sources_result"]
-
-    # если фронтенд не передал — считаем заново
-    if not model_result:
-        model_result = classify_text(text)
-    if not sources_result:
-        sources_result = find_sources(text)
-
-    analysis = deep_analyse(text, model_result, sources_result)
-
-    if analysis["error"]:
-        return {"error": analysis["error"]}, 503
-
-    return analysis
-```
-
----
 
 ## Переменные окружения
 
