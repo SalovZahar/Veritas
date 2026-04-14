@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veritas</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 280px;
+      background: #0f0f1a;
+      color: #e8e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      padding: 20px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #6c63ff, #a78bfa);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      color: white;
+      letter-spacing: -1px;
+      flex-shrink: 0;
+    }
+    .title { font-size: 16px; font-weight: 700; }
+    .subtitle { font-size: 11px; color: #6b6b8a; margin-top: 2px; }
+
+    .how {
+      background: #131326;
+      border: 1px solid #2a2a45;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+    .how-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #4a4a6a;
+      margin-bottom: 10px;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 12.5px;
+      color: #9898b8;
+      line-height: 1.4;
+    }
+    .step-num {
+      width: 18px;
+      height: 18px;
+      background: #1e1e36;
+      border: 1px solid #3a3a5c;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+      color: #6c63ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #0d2018;
+      border: 1px solid #1a4a2a;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #22c55e;
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      background: #22c55e;
+      border-radius: 50%;
+      animation: pulse 1.8s ease infinite;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px #22c55e;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+      50%       { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+    }
+
+    .api-row {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .api-row label {
+      font-size: 11px;
+      color: #4a4a6a;
+      flex-shrink: 0;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .api-row input {
+      flex: 1;
+      background: #131326;
+      border: 1px solid #2a2a45;
+      border-radius: 6px;
+      color: #c8c8e0;
+      font-size: 12px;
+      padding: 6px 8px;
+      outline: none;
+      font-family: monospace;
+    }
+    .api-row input:focus {
+      border-color: #6c63ff;
+      box-shadow: 0 0 0 2px rgba(108,99,255,0.2);
+    }
+    .save-btn {
+      margin-top: 10px;
+      width: 100%;
+      padding: 9px;
+      background: linear-gradient(135deg, #6c63ff, #8b5cf6);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: opacity 0.15s;
+    }
+    .save-btn:hover { opacity: 0.9; }
+    .saved-msg {
+      font-size: 11px;
+      color: #22c55e;
+      text-align: center;
+      margin-top: 6px;
+      height: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">V</div>
+    <div>
+      <div class="title">Veritas</div>
+      <div class="subtitle">Fake News Detector</div>
+    </div>
+  </div>
+
+  <div class="how">
+    <div class="how-title">Как использовать</div>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>Выдели любой текст на странице</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>Нажми появившуюся кнопку <strong style="color:#a78bfa">Veritas</strong></div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>Смотри результат в боковой панели</div>
+    </div>
+  </div>
+
+  <div class="status">
+    <div class="status-dot"></div>
+    <span>Расширение активно</span>
+  </div>
+
+  <!-- Настройка API URL -->
+  <div style="margin-top:16px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a4a6a;margin-bottom:8px">API сервер</div>
+    <div class="api-row">
+      <label>URL</label>
+      <input type="text" id="apiUrl" placeholder="http://localhost:8000">
+    </div>
+    <button class="save-btn" id="saveBtn">Сохранить</button>
+    <div class="saved-msg" id="savedMsg"></div>
+  </div>
+
+  <script>
+    const apiInput = document.getElementById("apiUrl");
+    const saveBtn  = document.getElementById("saveBtn");
+    const savedMsg = document.getElementById("savedMsg");
+
+    // Загружаем сохранённый URL
+    chrome.storage.local.get("apiBase", (data) => {
+      apiInput.value = data.apiBase || "http://localhost:8000";
+    });
+
+    saveBtn.addEventListener("click", () => {
+      const val = apiInput.value.trim().replace(/\/$/, "");
+      chrome.storage.local.set({ apiBase: val }, () => {
+        savedMsg.textContent = "✓ Сохранено";
+        setTimeout(() => savedMsg.textContent = "", 2000);
+        // Обновляем content.js в активной вкладке через message
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: "UPDATE_API_BASE", apiBase: val });
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
