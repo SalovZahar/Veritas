@@ -177,11 +177,11 @@ function renderResult(text, classify, sources) {
           <div class="vt-chip-val">${conf}%</div>
         </div>
         <div class="vt-chip">
-          <div class="vt-chip-label">Fake prob.</div>
+          <div class="vt-chip-label">Real prob.</div>
           <div class="vt-chip-val">${pFake}%</div>
         </div>
         <div class="vt-chip">
-          <div class="vt-chip-label">Real prob.</div>
+          <div class="vt-chip-label">Fake prob.</div>
           <div class="vt-chip-val">${pReal}%</div>
         </div>
       </div>
