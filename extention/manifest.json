@@ -1,26 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "Veritas",
+  "name": "Veritas — Fake News Detector",
   "version": "1.1.0",
-  "description": "AI-powered fake news detector. Select text or check the entire page.",
-  "icons": {
-    "16": "icon.png",
-    "48": "icon.png",
-    "128": "icon.png"
-  },
-  "action": {
-    "default_icon": "icon.png"
-  },
-  "permissions": ["storage"],
-  "host_permissions": [
-    "http://localhost:*/*",
-    "http://127.0.0.1:*/*"
-  ],
+  "description": "Select any text to check its credibility with AI.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://localhost:*/*", "http://127.0.0.1:*/*", "https://*/*"],
   "content_scripts": [
     {
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["content.css"],
-      "matches": ["<all_urls>"]
+      "css": ["content.css"]
     }
-  ]
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Veritas"
+  },
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

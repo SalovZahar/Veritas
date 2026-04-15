@@ -24,3 +24,6 @@ scripts/
 # OS
 .DS_Store
 
+ml/dataset.py
+ml/test_sourses.py
+ml/test.py
