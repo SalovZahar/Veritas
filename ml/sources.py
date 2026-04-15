@@ -125,7 +125,6 @@ def find_sources(text: str, num_results: int = 3) -> dict:
 
 
 def _error_result(message: str) -> dict:
-    """Возвращает пустой результат с текстом ошибки."""
     return {
         "query": "",
         "sources": [],

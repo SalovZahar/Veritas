@@ -1,11 +1,11 @@
-/* ═══════════════════════════════════════════════════════════════
+/*
    Veritas — content.js
    Flow:
-     1. User selects text  →  floating "Check" button appears
-     2. Click Check        →  panel opens, calls /classify + /sources
-     3. Results render     →  "Deep Analysis" button appears
-     4. Click Analysis     →  calls /deep-analyse, renders detailed view
-   ═══════════════════════════════════════════════════════════════ */
+     1. User selects text  floating "Check" button appears
+     2. Click Check        panel opens, calls /classify + /sources
+     3. Results render    "Deep Analysis" button appears
+     4. Click Analysis   calls /deep-analyse, renders detailed view
+*/
 
 let API_BASE = "http://localhost:8000";
 
@@ -17,16 +17,12 @@ if (typeof chrome !== "undefined" && chrome.storage) {
   });
 }
 
-/* ── State ──────────────────────────────────────────────────── */
+/* State  */
 let btn           = null;
 let panel         = null;
 let currentText   = "";
 let lastClassify  = null;   // cached for deep analysis
 let lastSources   = null;   // cached for deep analysis
-
-/* ══════════════════════════════════════════════════════════════
-   1. Floating "Check" button
-   ══════════════════════════════════════════════════════════════ */
 
 function createBtn() {
   if (btn) return;
@@ -72,9 +68,7 @@ document.addEventListener("mousedown", (e) => {
   }
 });
 
-/* ══════════════════════════════════════════════════════════════
-   2. Panel
-   ══════════════════════════════════════════════════════════════ */
+/* Panel */
 
 function createPanel() {
   if (!panel) {
@@ -97,9 +91,7 @@ function bindClose() {
   panel?.querySelector("#vt-close")?.addEventListener("click", closePanel);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   3. HTML builders
-   ══════════════════════════════════════════════════════════════ */
+/* HTML builders */
 
 function header(subtitle) {
   return `
@@ -123,7 +115,7 @@ function snippetHtml(text) {
     </div>`;
 }
 
-// ── Loading state ────────────────────────────────────────────
+// Loading state
 function renderLoading(text) {
   panel.innerHTML = header("Checking credibility…") + `
     <div class="vt-body">
@@ -136,7 +128,7 @@ function renderLoading(text) {
   bindClose();
 }
 
-// ── Main result state ─────────────────────────────────────────
+// Main result state
 function renderResult(text, classify, sources) {
   const score = classify.score ?? 0;
   const cls   = scoreClass(score);

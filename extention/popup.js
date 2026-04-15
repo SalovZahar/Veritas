@@ -10,7 +10,7 @@ saveBtn.addEventListener("click", () => {
   const val = apiInput.value.trim().replace(/\/$/, "");
   if (!val) return;
   chrome.storage.local.set({ apiBase: val }, () => {
-    savedMsg.textContent = "✓ Saved";
+    savedMsg.textContent = "Saved";
     setTimeout(() => { savedMsg.textContent = ""; }, 2000);
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {

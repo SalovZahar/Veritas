@@ -1,8 +1,4 @@
-/* ═══════════════════════════════════════════════════
-   Veritas — content.css
-   ═══════════════════════════════════════════════════ */
-
-/* ── Floating check button ─────────────────────────── */
+/* Floating check button */
 #veritas-btn {
   position: absolute;
   z-index: 2147483647;
@@ -47,7 +43,7 @@
   to   { opacity:1; transform:scale(1)   translateY(0); }
 }
 
-/* ── Side panel ────────────────────────────────────── */
+/*Side panel */
 #veritas-panel {
   position: fixed;
   top: 0; right: -400px;
@@ -66,7 +62,7 @@
 }
 #veritas-panel.open { right: 0; }
 
-/* ── Panel header ──────────────────────────────────── */
+/* Panel header */
 .vt-header {
   padding: 14px 16px;
   background: #10101e;
@@ -97,7 +93,7 @@
 }
 .vt-close:hover { background: #1a1a30; color: #e2e2f0; border-color: #3a3a5c; }
 
-/* ── Scrollable body ────────────────────────────────── */
+/* Scrollable body */
 .vt-body {
   flex: 1;
   overflow-y: auto;
@@ -110,14 +106,14 @@
 .vt-body::-webkit-scrollbar-track { background: transparent; }
 .vt-body::-webkit-scrollbar-thumb { background: #2a2a45; border-radius: 2px; }
 
-/* ── Section labels ─────────────────────────────────── */
+/*  Section labels */
 .vt-label {
   font-size: 10px; font-weight: 700;
   letter-spacing: 1px; text-transform: uppercase;
   color: #3d3d5c; margin-bottom: 5px;
 }
 
-/* ── Text snippet ────────────────────────────────────── */
+/* Text snippet */
 .vt-snippet {
   background: #12121f;
   border: 1px solid #22223a;
@@ -135,7 +131,7 @@
   border-radius: 0 0 8px 8px;
 }
 
-/* ── Loading ─────────────────────────────────────────── */
+/* Loading */
 .vt-loading {
   display: flex; flex-direction:column;
   align-items:center; padding: 28px 0; gap: 12px;
@@ -150,7 +146,7 @@
 @keyframes vt-spin { to { transform: rotate(360deg); } }
 .vt-loading-text { font-size: 12px; color: #555570; }
 
-/* ── Verdict card ────────────────────────────────────── */
+/* Verdict card */
 .vt-verdict {
   border-radius: 10px; padding: 14px;
   position: relative; overflow: hidden;
@@ -182,7 +178,7 @@
 .fake  .vt-verdict-name { color:#ef4444; }
 .vt-verdict-desc { font-size:12px; color:#7070a0; line-height:1.5; }
 
-/* ── Score bar ───────────────────────────────────────── */
+/* Score bar */
 .vt-score-block {
   background:#12121f; border:1px solid #22223a;
   border-radius:10px; padding:12px 14px;
@@ -207,7 +203,7 @@
 .mixed .vt-bar-fill { background:linear-gradient(90deg,#ca8a04,#eab308); }
 .fake  .vt-bar-fill { background:linear-gradient(90deg,#dc2626,#ef4444); }
 
-/* ── Stat chips row ─────────────────────────────────── */
+/* Stat chips row */
 .vt-chips { display:flex; gap:7px; }
 .vt-chip {
   flex:1; background:#12121f; border:1px solid #22223a;
@@ -216,7 +212,7 @@
 .vt-chip-label { font-size:9px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:#3d3d5c; margin-bottom:3px; }
 .vt-chip-val { font-size:15px; font-weight:800; color:#c8c8e8; }
 
-/* ── Analysis button ─────────────────────────────────── */
+/* Analysis button */
 .vt-analyse-btn {
   width:100%; padding:11px;
   background:linear-gradient(135deg,#6c5ce7,#8b5cf6);
@@ -239,13 +235,13 @@
   flex-shrink:0;
 }
 
-/* ── Divider ─────────────────────────────────────────── */
+/*  Divider */
 .vt-divider {
   height:1px; background:#1a1a2e;
   margin: 2px 0;
 }
 
-/* ── Sources ─────────────────────────────────────────── */
+/* Sources */
 .vt-sources-list { display:flex; flex-direction:column; gap:6px; }
 .vt-source {
   display:flex; align-items:center; gap:10px;
@@ -274,7 +270,7 @@
 .vt-badge.trusted { background:#091a10; color:#22c55e; border:1px solid #14472a; }
 .vt-badge.unknown { background:#1a1a2e; color:#3d3d5c; border:1px solid #22223a; }
 
-/* ── Deep analysis section ───────────────────────────── */
+/* Deep analysis section  */
 .vt-deep-header {
   display:flex; align-items:center; gap:8px;
   padding:10px 14px;
@@ -329,7 +325,7 @@
   padding-top:10px; border-top:1px solid #1e1e36;
 }
 
-/* ── Error ───────────────────────────────────────────── */
+/* Error */
 .vt-error {
   background:#1a0909; border:1px solid #471414;
   border-radius:10px; padding:14px;

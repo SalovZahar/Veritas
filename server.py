@@ -2,11 +2,8 @@
 Veritas FastAPI server.
 Connects the browser extension to the ML pipeline.
 
-Run:
-    uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
-
-Or from project root:
-    python -m uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
+    uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+    python -m uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 """
 
 from fastapi import FastAPI, HTTPException
@@ -26,13 +23,10 @@ app = FastAPI(
 # Allow requests from Chrome extension (chrome-extension://* origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # Extension uses chrome-extension:// origin
+    allow_origins=["*"],
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
 )
-
-
-# Request / Response models
 
 class TextRequest(BaseModel):
     text: str

@@ -1,7 +1,6 @@
 """
 Оценка качества обученной модели на тестовой выборке.
 
-python ml/eval.py
 """
 
 from pathlib import Path

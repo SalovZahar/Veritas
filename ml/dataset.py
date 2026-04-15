@@ -1,7 +1,6 @@
 """
 Dataset класс для обучения модели на WELFake.
 
-Принимает тексты и метки, токенизирует их и отдаёт батчи в train.py.
 """
 
 from typing import Sequence
@@ -48,7 +47,6 @@ class FakeNewsDataset(Dataset):
         )
 
         # squeeze(0) убирает лишнее измерение батча которое добавляет токенизатор
-        # было: [1, 512] → стало: [512]
         item = {k: v.squeeze(0) for k, v in encoding.items()}
         item["labels"] = torch.tensor(label, dtype=torch.long)
 

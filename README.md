@@ -1,202 +1,144 @@
-# Veritas Fake News Detector
+# Veritas — Fake News Detection System (ML + Source Verification + LLM Analysis)
 
-Описывает все ML-функции, их входные/выходные данные и порядок установки.
+**Veritas** is an open-source project designed to detect fake news using Machine Learning models combined with source verification and optional deep analysis powered by Large Language Models (LLMs).
+
+The goal of this project is not only to classify text as **fake** or **real**, but also to provide supporting evidence by searching trusted sources and generating an explainable final verdict.
 
 ---
 
-## Установка
+## 🚀 Features
 
-### 1. PyTorch с поддержкой GPU
+- 🧠 **Machine Learning Fake News Classification**  
+  Predicts whether a news article is `fake` or `real` with confidence score.
 
+- 🔍 **Source Searching & Verification**  
+  Finds relevant sources online and checks whether they belong to trusted domains.
+
+- 🤖 **LLM-powered Deep Analysis (optional)**  
+  Generates a structured explanation and reasoning behind the verdict.
+
+- 📊 **Explainable Output**  
+  Produces results with probabilities, confidence, and supporting links.
+
+---
+
+## 📦 Installation
+
+### 1. Clone the repository
 ```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+git clone https://github.com/SalovZahar/Veritas.git
+cd Veritas
 ```
 
-### 2. Остальные зависимости
-
+### 2. Install dependencies
 ```bash
-pip install transformers scikit-learn pandas numpy ddgs httpx python-dotenv
+pip install -r requirements.txt
 ```
 
-### 3. Веса модели
+### 3. Set up environment variables
+Create a `.env` file in the root directory:
 
-Получить у ML-разработчика :
+```env
+LLM_API_KEY=your_api_key_here
 ```
-директорию models
 
-ссылка: 
+*(If your LLM provider uses a different key name, adjust it in your code.)*
+
+
+### 4. Download model
+
+Download model, create `models/` directory at the project root and place it inside.
+
 https://drive.google.com/file/d/1u8ZEnB5sV25YFhsfgMhN7fZdFVbF8YW8/view?usp=sharing
-```
 
-### 4. Переменные окружения
+Should be like this:
+```bash
+models/
+├── roberta-local
+    ├── config.json
+    ├── model.safetensors
+    ├── tokenizer.json
+    ├── config_config.json
+├── config.json
+├── medel.pt
+└── medel_best.pt
 
-Создать файл `.env` в корне проекта:
-```
-LLM_API_KEY=sk-or-xxxxxxxxxxxxxxxx
 ```
 
 ---
 
-## Три функции ML-модуля
+## Functional
 
+### ✅ Quick Fake News Classification
 ```python
-from ml.inference     import classify_text   # быстрая классификация
-from ml.sources       import find_sources    # поиск источников
-from ml.deep_analysis import deep_analyse    # глубокий анализ через LLM
+from ml.inference import classify_text
+
+text = "Breaking news: something happened..."
+result = classify_text(text)
+
+print(result)
 ```
 
-> **Важно:** импортировать модули один раз при старте сервера.  
-> `classify_text` загружает модель при импорте — это занимает ~3 секунды.  
-
----
-
-## Функция 1 — classify_text()
-
-Быстрая классификация текста. Вызывается при нажатии кнопки **"Проверить"**.
-
+### 🔎 Search for Sources
 ```python
-result = classify_text("текст статьи...")
+from ml.sources import find_sources
+
+sources = find_sources("Some news statement to verify")
+print(sources)
 ```
 
-### Входные данные
-
-| Параметр | Тип | Описание |
-|---|---|---|
-| `text` | `str` | Текст статьи, минимум 10 символов |
-
-### Возвращает
-
+### 🤖 Deep Analysis with LLM
 ```python
-{
-    "label":      "fake",   # "fake" или "real"
-    "confidence": 0.94,     # уверенность модели, 0.0 – 1.0
-    "score":      6,        # 0 = фейк, 100 = достоверно
-    "probs": {
-        "fake": 0.94,
-        "real": 0.06,
-    }
-}
-```
+from ml.deep_analysis import deep_analyse
 
-### Логика цвета плашки для фронтенда
-
-```
-score  0 – 35   → 🔴 красный  → "Вероятно фейк"
-score 36 – 64   → 🟡 жёлтый   → "Спорно"
-score 65 – 100  → 🟢 зелёный  → "Вероятно достоверно"
-```
-
-### Ошибки
-
-```python
-# Если текст слишком короткий
-ValueError("Text is too short. Minimum length is 10 characters.")
-# → вернуть клиенту 400 Bad Request
+analysis = deep_analyse(news_text, model_result, sources_result)
+print(analysis)
 ```
 
 ---
 
-## Функция 2 — find_sources()
+## 📊 Usage
 
-Поиск источников по тексту через DuckDuckGo. Вызывается вместе с `classify_text`.
+to start the server, enter the terminal:
 
-```python
-result = find_sources("текст статьи...")
+```bash
+    uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```
-
-### Входные данные
-
-| Параметр | Тип | Описание |
-|---|---|---|
-| `text` | `str` | Текст статьи |
-| `num_results` | `int` | Кол-во источников (по умолчанию 3) |
-
-### Возвращает
-
-```python
-{
-    "query": "Federal Reserve raised interest rates news",
-    "sources": [
-        {
-            "title":        "Fed Holds Rates Steady — Reuters",
-            "url":          "https://reuters.com/...",
-            "domain":       "reuters.com",
-            "snippet":      "краткое описание страницы...",
-            "trusted":      True,
-            "trusted_name": "Reuters",   # None если не в списке доверенных
-        },
-        ...
-    ],
-    "trusted_count": 1,   # сколько источников из доверенного списка
-    "error": None         # строка с ошибкой если что-то пошло не так
-}
+or
+```bash
+    python -m uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 ```
+---
 
-### Обработка ошибок
+## 🔥 Future Improvements
 
-```python
-result = find_sources(text)
-if result["error"]:
-    # не падаем — просто возвращаем пустой список источников
-    # функция всегда возвращает dict, никогда не кидает исключение
-    pass
-```
+Planned enhancements:
+
+- GitHub Actions CI pipeline
+- Docker support
+- Web UI / frontend
+- OpenAPI (Swagger) documentation
+- Benchmarking against public fake-news datasets
+- Improved trusted-source ranking system
 
 ---
 
-## Функция 3 — deep_analyse()
+## 🤝 Contributing
 
-Глубокий анализ через LLM (OpenRouter). Вызывается при нажатии кнопки **"Глубокий анализ"**
+Contributions are welcome!
 
-```python
-result = deep_analyse(
-    news_text=text,
-    model_result=classify_text(text),      # результат из функции 1
-    sources_result=find_sources(text),     # результат из функции 2
-)
-```
+If you want to improve Veritas:
 
-### Входные данные
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Open a Pull Request
 
-| Параметр | Тип | Описание |
-|---|---|---|
-| `news_text` | `str` | Текст статьи |
-| `model_result` | `dict` | Результат `classify_text()` |
-| `sources_result` | `dict` | Результат `find_sources()` |
-
-### Возвращает
-
-```python
-{
-    "verdict":    "fake",          # fake / likely_fake / mixed / likely_real / real
-    "confidence": 95,              # уверенность LLM, 0–100
-    "explanation": "The article uses sensationalist language...",
-    "signals": {
-        "factual_issues":     ["No scientific evidence for claim X"],
-        "manipulation_signs": ["Use of SHOCKING", "Fear-mongering"],
-        "source_analysis":    ["Reuters confirms the event", "Unknown site sott.net"],
-        "contradictions":     ["Claim X contradicts statement Y"]
-    },
-    "final_reasoning": "Detailed analysis in 5-10 sentences...",
-    "error": None
-}
-```
-
-### Обработка ошибок
-
-```python
-result = deep_analyse(text, model_result, sources_result)
-if result["error"]:
-    # вернуть клиенту 503 Service Unavailable
-    # LLM может быть недоступна
-    pass
-```
+If you find a bug or want a feature, feel free to open an issue.
 
 ---
 
+### Contact us
+ <a href="mailto:sosikoni@gmail.com">gmail.com</a>
 
-## Переменные окружения
 
-| Переменная | Описание |
-|---|---|
-| `LLM_API_KEY` | Ключ OpenRouter (`sk-or-...`) |
