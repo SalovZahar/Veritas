@@ -1,436 +1,456 @@
-/*
+/* ═══════════════════════════════════════════════════════════════
    Veritas — content.js
+   UI by friend, ML integration added.
+
    Flow:
-     1. User selects text  floating "Check" button appears
-     2. Click Check        panel opens, calls /classify + /sources
-     3. Results render    "Deep Analysis" button appears
-     4. Click Analysis   calls /deep-analyse, renders detailed view
-*/
+     Trigger btn → Mode menu → [Check Entire Page | Check Selected Text]
+     → Main modal with textarea → [Quick Check] → classify + sources
+     → [Deep Analysis] → deep_analyse (reuses cached results)
+   ═══════════════════════════════════════════════════════════════ */
 
+// ── Config ────────────────────────────────────────────────────
 let API_BASE = "http://localhost:8000";
-
-// Load saved API URL
 if (typeof chrome !== "undefined" && chrome.storage) {
   chrome.storage.local.get("apiBase", (d) => { if (d.apiBase) API_BASE = d.apiBase; });
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === "UPDATE_API_BASE") API_BASE = msg.apiBase;
-  });
 }
 
-/* State  */
-let btn           = null;
-let panel         = null;
-let currentText   = "";
-let lastClassify  = null;   // cached for deep analysis
-let lastSources   = null;   // cached for deep analysis
+// ── State ─────────────────────────────────────────────────────
+let lastClassifyResult = null;
+let lastSourcesResult  = null;
+let lastText           = "";
 
-function createBtn() {
-  if (btn) return;
-  btn = document.createElement("div");
-  btn.id = "veritas-btn";
-  btn.innerHTML = `<div class="vt-btn-dot"></div>Check`;
-  btn.addEventListener("click", onCheckClick);
-  document.body.appendChild(btn);
-}
+// ── Inject HTML ───────────────────────────────────────────────
+const triggerBtn = document.createElement('button');
+triggerBtn.id = 'ta-trigger-btn';
+triggerBtn.innerHTML = 'Verify Page';
+document.body.appendChild(triggerBtn);
 
-function removeBtn() {
-  if (btn) { btn.remove(); btn = null; }
-}
+const modalHTML = `
+  <div id="ta-overlay" class="ta-hidden">
 
-function positionBtn(clientX, rangeTop) {
-  if (!btn) return;
-  const W = 80;
-  let left = Math.min(clientX, window.innerWidth - W - 8);
-  if (left < 4) left = 4;
-  let top = rangeTop - 44;
-  if (top < 4) top = rangeTop + 14;
-  btn.style.left = (left + window.scrollX) + "px";
-  btn.style.top  = (top  + window.scrollY) + "px";
-}
-
-document.addEventListener("mouseup", (e) => {
-  setTimeout(() => {
-    const sel  = window.getSelection();
-    const text = sel ? sel.toString().trim() : "";
-    if (text.length < 30) { removeBtn(); return; }
-    currentText = text;
-    createBtn();
-    try {
-      const rect = sel.getRangeAt(0).getBoundingClientRect();
-      positionBtn(e.clientX, rect.top);
-    } catch (_) {}
-  }, 10);
-});
-
-document.addEventListener("mousedown", (e) => {
-  if (btn && !btn.contains(e.target) && (!panel || !panel.contains(e.target))) {
-    removeBtn();
-  }
-});
-
-/* Panel */
-
-function createPanel() {
-  if (!panel) {
-    panel = document.createElement("div");
-    panel.id = "veritas-panel";
-    document.body.appendChild(panel);
-  }
-  requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add("open")));
-}
-
-function closePanel() {
-  if (!panel) return;
-  panel.classList.remove("open");
-  setTimeout(() => { panel && panel.remove(); panel = null; }, 360);
-  lastClassify = null;
-  lastSources  = null;
-}
-
-function bindClose() {
-  panel?.querySelector("#vt-close")?.addEventListener("click", closePanel);
-}
-
-/* HTML builders */
-
-function header(subtitle) {
-  return `
-    <div class="vt-header">
-      <div class="vt-header-left">
-        <div class="vt-logo">V</div>
-        <div>
-          <div class="vt-header-title">Veritas</div>
-          <div class="vt-header-sub">${subtitle}</div>
+    <div id="ta-mode-menu" class="ta-modal-box">
+      <div class="ta-header-bar" style="border-radius:12px 12px 0 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+          <h2 style="margin:0;color:white;font-size:18px;">Select Mode</h2>
+          <button class="ta-close-x" style="background:transparent;border:none;color:white;font-size:20px;cursor:pointer;">✕</button>
         </div>
       </div>
-      <button class="vt-close" id="vt-close">✕</button>
-    </div>`;
-}
-
-function snippetHtml(text) {
-  return `
-    <div>
-      <div class="vt-label">Analysed text</div>
-      <div class="vt-snippet">${esc(text)}</div>
-    </div>`;
-}
-
-// Loading state
-function renderLoading(text) {
-  panel.innerHTML = header("Checking credibility…") + `
-    <div class="vt-body">
-      ${snippetHtml(text)}
-      <div class="vt-loading">
-        <div class="vt-spinner"></div>
-        <div class="vt-loading-text">Running model and searching sources…</div>
-      </div>
-    </div>`;
-  bindClose();
-}
-
-// Main result state
-function renderResult(text, classify, sources) {
-  const score = classify.score ?? 0;
-  const cls   = scoreClass(score);
-  const conf  = Math.round((classify.confidence ?? 0) * 100);
-  const pFake = Math.round((classify.probs?.fake ?? 0) * 100);
-  const pReal = Math.round((classify.probs?.real ?? 0) * 100);
-
-  panel.innerHTML = header("Credibility check") + `
-    <div class="vt-body">
-
-      ${snippetHtml(text)}
-
-      <!-- Verdict -->
-      <div class="vt-verdict ${cls}">
-        <div class="vt-verdict-glow"></div>
-        <div class="vt-verdict-row">
-          <div class="vt-dot"></div>
-          <div class="vt-verdict-name">${verdictLabel(cls)}</div>
-        </div>
-        <div class="vt-verdict-desc">${verdictDesc(cls)}</div>
-      </div>
-
-      <!-- Score bar -->
-      <div class="vt-score-block ${cls}">
-        <div class="vt-score-top">
-          <span class="vt-label" style="margin:0">Trust score</span>
-          <span class="vt-score-num">${score}<span style="font-size:11px;opacity:.45">/100</span></span>
-        </div>
-        <div class="vt-bar-bg">
-          <div class="vt-bar-fill" id="vt-bar" style="width:0%"></div>
-        </div>
-      </div>
-
-      <!-- Chips -->
-      <div class="vt-chips">
-        <div class="vt-chip">
-          <div class="vt-chip-label">Confidence</div>
-          <div class="vt-chip-val">${conf}%</div>
-        </div>
-        <div class="vt-chip">
-          <div class="vt-chip-label">Real prob.</div>
-          <div class="vt-chip-val">${pFake}%</div>
-        </div>
-        <div class="vt-chip">
-          <div class="vt-chip-label">Fake prob.</div>
-          <div class="vt-chip-val">${pReal}%</div>
-        </div>
-      </div>
-
-      <!-- Sources -->
-      <div>
-        <div class="vt-label">Sources found</div>
-        ${buildSources(sources)}
-      </div>
-
-      <div class="vt-divider"></div>
-
-      <!-- Deep analysis button -->
-      <button class="vt-analyse-btn" id="vt-deep-btn">
-        🔬 Run Deep Analysis
-      </button>
-
-    </div>`;
-
-  bindClose();
-
-  // animate bar
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    const bar = panel?.querySelector("#vt-bar");
-    if (bar) bar.style.width = score + "%";
-  }));
-
-  panel?.querySelector("#vt-deep-btn")?.addEventListener("click", onDeepClick);
-}
-
-// ── Deep analysis loading state ───────────────────────────────
-function renderDeepLoading() {
-  const btn = panel?.querySelector("#vt-deep-btn");
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = `<div class="vt-btn-spinner"></div>Analysing with AI…`;
-  }
-}
-
-// ── Deep analysis result (appended below button) ──────────────
-function renderDeepResult(result) {
-  const btn = panel?.querySelector("#vt-deep-btn");
-  if (btn) btn.remove();
-
-  const cls = deepVerdictClass(result.verdict);
-
-  // Collect all signals into flat list
-  const signals = [];
-  const s = result.signals || {};
-  (s.factual_issues     || []).forEach(t => signals.push({ icon: "🔍", text: t }));
-  (s.manipulation_signs || []).forEach(t => signals.push({ icon: "⚠️", text: t }));
-  (s.source_analysis    || []).forEach(t => signals.push({ icon: "📰", text: t }));
-  (s.contradictions     || []).forEach(t => signals.push({ icon: "⚡", text: t }));
-
-  const signalsHtml = signals.length
-    ? signals.map(s => `
-        <div class="vt-deep-signal">
-          <span class="vt-sig-icon">${s.icon}</span>
-          <span>${esc(s.text)}</span>
-        </div>`).join("")
-    : `<div class="vt-deep-signal"><span class="vt-sig-icon">ℹ️</span><span>No specific signals found.</span></div>`;
-
-  const block = document.createElement("div");
-  block.innerHTML = `
-    <div class="vt-deep-header">
-      <div class="vt-deep-header-icon">🔬</div>
-      <div>
-        <div class="vt-deep-header-title">Deep Analysis</div>
-        <div class="vt-deep-header-sub">Powered by LLM (OpenRouter)</div>
+      <div style="padding:24px;display:flex;flex-direction:column;gap:12px;">
+        <button id="ta-btn-all" class="ta-mode-opt" style="background:#f0f4ff;color:#5f0865;border:1px solid #5f0865;padding:15px;border-radius:8px;font-weight:bold;cursor:pointer;text-align:left;font-size:15px;">🌐 Check Entire Page</button>
+        <button id="ta-btn-select" class="ta-mode-opt" style="background:#f0f4ff;color:#5f0865;border:1px solid #5f0865;padding:15px;border-radius:8px;font-weight:bold;cursor:pointer;text-align:left;font-size:15px;">🖱️ Check Selected Text</button>
       </div>
     </div>
-    <div class="vt-deep-card">
-      <div class="vt-deep-verdict-row">
-        <div class="vt-dot ${cls}"></div>
-        <div class="vt-deep-verdict-text ${cls}" style="color:${deepVerdictColor(cls)}">
-          ${deepVerdictLabel(result.verdict)} — ${result.confidence}% confidence
+
+    <div id="ta-main-modal" class="ta-modal-box ta-hidden" style="width:700px;">
+      <div class="ta-header-bar" style="border-radius:12px 12px 0 0;padding:20px 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;width:100%">
+          <div>
+            <h2 style="margin:0;color:white;font-size:18px;">Text Analysis</h2>
+            <p style="margin:5px 0 0;font-size:13px;color:#e0e0e0;">Verifying information authenticity</p>
+          </div>
+          <button class="ta-close-x" style="background:transparent;border:none;color:white;font-size:20px;cursor:pointer;">✕</button>
         </div>
       </div>
-      <div class="vt-deep-explanation">${esc(result.explanation || "")}</div>
-      <div>
-        <div class="vt-label" style="margin-bottom:6px">Signals detected</div>
-        <div class="vt-deep-signals">${signalsHtml}</div>
-      </div>
-      ${result.final_reasoning ? `
-        <div class="vt-deep-reasoning">
-          <div class="vt-label" style="margin-bottom:6px">Full reasoning</div>
-          ${esc(result.final_reasoning)}
-        </div>` : ""}
-    </div>`;
 
-  panel?.querySelector(".vt-body")?.appendChild(block);
-
-  // scroll to bottom
-  const body = panel?.querySelector(".vt-body");
-  if (body) setTimeout(() => body.scrollTo({ top: body.scrollHeight, behavior: "smooth" }), 100);
-}
-
-// ── Error ─────────────────────────────────────────────────────
-function renderError(msg) {
-  panel.innerHTML = header("Error") + `
-    <div class="vt-body">
-      <div class="vt-error">
-        Could not connect to Veritas server.<br>
-        <code>${esc(msg)}</code><br><br>
-        Make sure the backend is running at<br>
-        <code>${API_BASE}</code>
-      </div>
-    </div>`;
-  bindClose();
-}
-
-function renderDeepError(msg) {
-  const btn = panel?.querySelector("#vt-deep-btn");
-  if (btn) {
-    btn.disabled = false;
-    btn.innerHTML = "🔬 Run Deep Analysis";
-  }
-  const body = panel?.querySelector(".vt-body");
-  if (!body) return;
-  const err = document.createElement("div");
-  err.className = "vt-error";
-  err.innerHTML = `Deep analysis failed.<br><code>${esc(msg)}</code>`;
-  body.appendChild(err);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   4. Sources HTML
-   ══════════════════════════════════════════════════════════════ */
-function buildSources(sourcesData) {
-  const list = sourcesData?.sources || [];
-  if (!list.length) {
-    return `<div style="font-size:12px;color:#3d3d5c;padding:6px 0">No sources found.</div>`;
-  }
-  return `<div class="vt-sources-list">` +
-    list.map(s => `
-      <a class="vt-source" href="${esc(s.url)}" target="_blank" rel="noopener">
-        <div class="vt-source-icon">${s.trusted ? "✅" : "🔗"}</div>
-        <div class="vt-source-body">
-          <div class="vt-source-name">${esc(s.trusted_name || s.title || s.domain)}</div>
-          <div class="vt-source-domain">${esc(s.domain)}</div>
+      <div id="ta-result-banner" class="ta-hidden">
+        <div class="ta-result-icon"></div>
+        <div class="ta-result-text">
+          <div class="ta-result-title"></div>
+          <div class="ta-result-desc"></div>
         </div>
-        <span class="vt-badge ${s.trusted ? "trusted" : "unknown"}">${s.trusted ? "Trusted" : "Unknown"}</span>
-      </a>`).join("") +
-    `</div>`;
-}
+      </div>
 
-/* ══════════════════════════════════════════════════════════════
-   5. API calls
-   ══════════════════════════════════════════════════════════════ */
+      <div id="ta-body" style="max-height:65vh;overflow-y:auto;padding:24px;">
 
-async function onCheckClick() {
-  removeBtn();
-  createPanel();
-  renderLoading(currentText);
+        <div style="margin-bottom:10px;">
+          <span style="font-weight:bold;color:#333;font-size:16px;">Target Text:</span>
+        </div>
 
-  try {
-    const [classifyRes, sourcesRes] = await Promise.all([
-      fetch(`${API_BASE}/classify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: currentText }),
-      }),
-      fetch(`${API_BASE}/sources`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: currentText }),
-      }).catch(() => null),
-    ]);
+        <textarea id="ta-textarea" readonly
+          style="width:100%;height:120px;margin-bottom:20px;border-radius:8px;border:1px solid #e0e0e0;
+                 padding:12px;font-family:inherit;font-size:14px;line-height:1.5;resize:none;box-sizing:border-box;"></textarea>
 
-    if (!classifyRes.ok) {
-      const err = await classifyRes.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${classifyRes.status}`);
-    }
+        <div style="display:flex;gap:15px;margin-bottom:25px;">
+          <button id="ta-check-btn"
+            style="flex:1;background:#5f0865;color:white;border:none;padding:14px;
+                   border-radius:8px;font-weight:bold;font-size:15px;cursor:pointer;">
+            Quick Check
+          </button>
+          <button id="ta-deep-check-btn"
+            style="flex:1;background:white;color:#5f0865;border:2px solid #5f0865;padding:14px;
+                   border-radius:8px;font-weight:bold;font-size:15px;cursor:pointer;opacity:0.4;"
+            disabled>
+            🔍 Deep Analysis
+          </button>
+        </div>
 
-    lastClassify = await classifyRes.json();
-    lastSources  = sourcesRes ? await sourcesRes.json() : { sources: [], error: null };
+        <div class="ta-legend" style="font-size:14px;color:#666;">
+          <p style="margin-bottom:12px;font-weight:bold;color:#333;">Trust Indicators:</p>
+          <div style="display:flex;gap:20px;">
+            <span style="display:flex;align-items:center;gap:6px;"><span style="display:block;width:12px;height:12px;border-radius:50%;background:#00c853;"></span>Reliable</span>
+            <span style="display:flex;align-items:center;gap:6px;"><span style="display:block;width:12px;height:12px;border-radius:50%;background:#ffbc00;"></span>Partly Reliable</span>
+            <span style="display:flex;align-items:center;gap:6px;"><span style="display:block;width:12px;height:12px;border-radius:50%;background:#ff3d00;"></span>Unreliable</span>
+          </div>
+        </div>
 
-  } catch (err) {
-    renderError(err.message);
-    return;
-  }
+        <div id="ta-sources-section" class="ta-hidden"
+          style="margin-top:25px;border-top:1px solid #eee;padding-top:20px;">
+          <p style="font-weight:bold;color:#333;margin-bottom:15px;">Information Sources:</p>
+          <div id="ta-sources-list"></div>
+        </div>
 
-  renderResult(currentText, lastClassify, lastSources);
-}
+        <div id="ta-deep-section" class="ta-hidden"
+          style="margin-top:25px;border-top:1px solid #eee;padding-top:20px;">
+          <p style="font-weight:bold;color:#333;margin-bottom:15px;">🔬 Deep Analysis:</p>
+          <div id="ta-deep-content"></div>
+        </div>
 
-async function onDeepClick() {
-  if (!lastClassify || !lastSources) return;
-  renderDeepLoading();
+      </div>
+    </div>
+  </div>
+`;
 
-  let result;
-  try {
-    const res = await fetch(`${API_BASE}/deep-analyse`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text:           currentText,
-        model_result:   lastClassify,
-        sources_result: lastSources,
-      }),
-    });
+document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `HTTP ${res.status}`);
-    }
+// ── DOM refs ──────────────────────────────────────────────────
+const overlay        = document.getElementById('ta-overlay');
+const modeMenu       = document.getElementById('ta-mode-menu');
+const mainModal      = document.getElementById('ta-main-modal');
+const textarea       = document.getElementById('ta-textarea');
+const btnAll         = document.getElementById('ta-btn-all');
+const btnSelect      = document.getElementById('ta-btn-select');
+const checkBtn       = document.getElementById('ta-check-btn');
+const deepCheckBtn   = document.getElementById('ta-deep-check-btn');
+const resultBanner   = document.getElementById('ta-result-banner');
+const sourcesSection = document.getElementById('ta-sources-section');
+const sourcesList    = document.getElementById('ta-sources-list');
+const deepSection    = document.getElementById('ta-deep-section');
+const deepContent    = document.getElementById('ta-deep-content');
 
-    result = await res.json();
+// ── SVG Icons ─────────────────────────────────────────────────
+const iconSuccess = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+const iconWarning = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+const iconError   = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
 
-  } catch (err) {
-    renderDeepError(err.message);
-    return;
-  }
-
-  renderDeepResult(result);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   6. Helpers
-   ══════════════════════════════════════════════════════════════ */
-
-function scoreClass(score) {
-  if (score >= 65) return "real";
-  if (score >= 35) return "mixed";
-  return "fake";
-}
-function verdictLabel(cls) {
-  return { real: "Trustworthy", mixed: "Partially Trustworthy", fake: "Not Trustworthy" }[cls];
-}
-function verdictDesc(cls) {
-  return {
-    real:  "The text appears credible. No major disinformation signals detected.",
-    mixed: "The text may contain inaccuracies or bias. Verify with additional sources.",
-    fake:  "High fake-news risk. Cross-check with authoritative sources before sharing.",
-  }[cls];
-}
-
-function deepVerdictClass(verdict) {
-  if (!verdict) return "mixed";
-  if (verdict === "real" || verdict === "likely_real") return "real";
-  if (verdict === "fake" || verdict === "likely_fake") return "fake";
-  return "mixed";
-}
-function deepVerdictColor(cls) {
-  return { real:"#22c55e", mixed:"#eab308", fake:"#ef4444" }[cls] || "#eab308";
-}
-function deepVerdictLabel(verdict) {
-  return {
-    real:        "REAL",
-    likely_real: "LIKELY REAL",
-    mixed:       "MIXED",
-    likely_fake: "LIKELY FAKE",
-    fake:        "FAKE",
-  }[verdict] || (verdict || "UNKNOWN").toUpperCase();
-}
-
+// ── Helpers ───────────────────────────────────────────────────
 function esc(str) {
   return String(str ?? "")
     .replace(/&/g,"&amp;").replace(/</g,"&lt;")
     .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
+
+function scoreToClass(score) {
+  if (score >= 65) return 'success';
+  if (score >= 35) return 'warning';
+  return 'error';
+}
+
+function scoreToLabel(score) {
+  if (score >= 65) return 'Reliable';
+  if (score >= 35) return 'Partly Reliable';
+  return 'Unreliable';
+}
+
+function scoreToDesc(score, conf) {
+  const pct = Math.round(conf * 100);
+  if (score >= 65) return `Text appears credible. Model confidence: ${pct}%.`;
+  if (score >= 35) return `May contain inaccuracies or bias. Model confidence: ${pct}%. Verify with additional sources.`;
+  return `High fake-news risk detected. Model confidence: ${pct}%. Cross-check before sharing.`;
+}
+
+function resetModal() {
+  resultBanner.className = 'ta-hidden';
+  sourcesSection.classList.add('ta-hidden');
+  deepSection.classList.add('ta-hidden');
+  deepContent.innerHTML = '';
+  sourcesList.innerHTML = '';
+  deepCheckBtn.disabled = true;
+  deepCheckBtn.style.opacity = '0.4';
+  deepCheckBtn.textContent = '🔍 Deep Analysis';
+  checkBtn.textContent = 'Quick Check';
+  checkBtn.disabled = false;
+  lastClassifyResult = null;
+  lastSourcesResult  = null;
+}
+
+function openMainModal(text) {
+  textarea.value = text;
+  lastText = text;
+  resetModal();
+  modeMenu.classList.add('ta-hidden');
+  mainModal.classList.remove('ta-hidden');
+}
+
+// ── Render sources ────────────────────────────────────────────
+function renderSources(sourcesData) {
+  sourcesList.innerHTML = '';
+  const sources = sourcesData?.sources || [];
+
+  if (!sources.length) {
+    sourcesList.innerHTML = '<p style="color:#999;font-size:14px;">No sources found for this text.</p>';
+    sourcesSection.classList.remove('ta-hidden');
+    return;
+  }
+
+  sources.forEach(src => {
+    const card = document.createElement('a');
+    card.className = 'ta-source-card';
+    card.href = src.url || '#';
+    card.target = '_blank';
+    card.rel = 'noopener';
+    card.style.textDecoration = 'none';
+
+    const badge = src.trusted
+      ? `<span class="ta-source-tag" style="background:#e8f5e9;color:#2e7d32;border-color:#c8e6c9;">✓ Trusted</span>`
+      : `<span class="ta-source-tag">Unknown</span>`;
+
+    card.innerHTML = `
+      <div class="ta-source-icon">${src.trusted ? '✅' : '🔗'}</div>
+      <div class="ta-source-info">
+        <div class="ta-source-title">${esc(src.trusted_name || src.title || src.domain)}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+          ${badge}
+          <span style="font-size:12px;color:#aaa;">${esc(src.domain)}</span>
+        </div>
+        ${src.snippet
+          ? `<div style="font-size:12px;color:#888;margin-top:5px;line-height:1.4;">${esc(src.snippet.slice(0,120))}…</div>`
+          : ''}
+      </div>`;
+
+    sourcesList.appendChild(card);
+  });
+
+  sourcesSection.classList.remove('ta-hidden');
+}
+
+// ── Render deep analysis ──────────────────────────────────────
+function renderDeepAnalysis(result) {
+  const verdictColor = {
+    real:'#00c853', likely_real:'#69f0ae',
+    mixed:'#ffbc00',
+    likely_fake:'#ff6d00', fake:'#ff3d00',
+  }[result.verdict] || '#ffbc00';
+
+  const verdictLabel = {
+    real:'REAL', likely_real:'LIKELY REAL',
+    mixed:'MIXED',
+    likely_fake:'LIKELY FAKE', fake:'FAKE',
+  }[result.verdict] || (result.verdict || 'UNKNOWN').toUpperCase();
+
+  const signals = result.signals || {};
+  const all = [
+    ...(signals.factual_issues     || []).map(t => ({ icon:'🔍', text:t })),
+    ...(signals.manipulation_signs || []).map(t => ({ icon:'⚠️', text:t })),
+    ...(signals.source_analysis    || []).map(t => ({ icon:'📰', text:t })),
+    ...(signals.contradictions     || []).map(t => ({ icon:'⚡', text:t })),
+  ];
+
+  const signalsHtml = all.length
+    ? all.map(s => `
+        <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f0;
+                    font-size:14px;color:#555;line-height:1.4;">
+          <span style="flex-shrink:0;">${s.icon}</span>
+          <span>${esc(s.text)}</span>
+        </div>`).join('')
+    : '<p style="color:#999;font-size:14px;">No specific signals detected.</p>';
+
+  deepContent.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;padding:14px;
+                background:#f8f9fa;border-radius:10px;margin-bottom:16px;">
+      <div style="width:14px;height:14px;border-radius:50%;background:${verdictColor};
+                  box-shadow:0 0 8px ${verdictColor}80;flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:16px;font-weight:bold;color:${verdictColor};">${verdictLabel}</div>
+        <div style="font-size:13px;color:#888;margin-top:2px;">LLM confidence: ${result.confidence}%</div>
+      </div>
+    </div>
+
+    <div style="font-size:14px;color:#444;line-height:1.6;margin-bottom:16px;
+                padding:12px;background:#f8f9fa;border-radius:8px;">
+      ${esc(result.explanation || '')}
+    </div>
+
+    ${all.length ? `
+    <div style="margin-bottom:16px;">
+      <p style="font-weight:bold;color:#333;margin-bottom:8px;font-size:14px;">Detected Signals:</p>
+      ${signalsHtml}
+    </div>` : ''}
+
+    ${result.final_reasoning ? `
+    <div style="background:#f8f9fa;border-radius:8px;padding:14px;">
+      <p style="font-weight:bold;color:#333;margin-bottom:8px;font-size:14px;">Full Reasoning:</p>
+      <p style="font-size:13px;color:#555;line-height:1.7;margin:0;">${esc(result.final_reasoning)}</p>
+    </div>` : ''}
+  `;
+
+  deepSection.classList.remove('ta-hidden');
+  setTimeout(() => deepSection.scrollIntoView({ behavior:'smooth', block:'start' }), 100);
+}
+
+// ── Quick Check ───────────────────────────────────────────────
+async function runQuickCheck() {
+  const text = textarea.value.trim();
+  if (text.length < 10) { alert('Please enter at least 10 characters.'); return; }
+
+  lastText = text;
+  checkBtn.disabled = true;
+  checkBtn.textContent = 'Analyzing…';
+  deepCheckBtn.disabled = true;
+  deepCheckBtn.style.opacity = '0.4';
+  resultBanner.className = 'ta-hidden';
+  sourcesSection.classList.add('ta-hidden');
+  deepSection.classList.add('ta-hidden');
+
+  try {
+    const [classifyRes, sourcesRes] = await Promise.all([
+      fetch(`${API_BASE}/classify`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text }),
+      }),
+      fetch(`${API_BASE}/sources`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text }),
+      }).catch(() => null),
+    ]);
+
+    if (!classifyRes.ok) {
+      const err = await classifyRes.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error ${classifyRes.status}`);
+    }
+
+    lastClassifyResult = await classifyRes.json();
+    lastSourcesResult  = sourcesRes ? await sourcesRes.json() : { sources:[], error:null };
+
+  } catch (err) {
+    resultBanner.className = 'ta-result-error';
+    resultBanner.querySelector('.ta-result-icon').innerHTML = iconError;
+    resultBanner.querySelector('.ta-result-title').textContent = 'Connection Failed';
+    resultBanner.querySelector('.ta-result-desc').textContent =
+      `Cannot reach server at ${API_BASE}. Run: uvicorn api.server:app --port 8000`;
+    checkBtn.disabled = false;
+    checkBtn.textContent = 'Quick Check';
+    return;
+  }
+
+  // Show banner
+  const score = lastClassifyResult.score ?? 0;
+  const type  = scoreToClass(score);
+  const icon  = type === 'success' ? iconSuccess : type === 'warning' ? iconWarning : iconError;
+  resultBanner.className = `ta-result-${type}`;
+  resultBanner.querySelector('.ta-result-icon').innerHTML = icon;
+  resultBanner.querySelector('.ta-result-title').textContent = scoreToLabel(score);
+  resultBanner.querySelector('.ta-result-desc').textContent =
+    scoreToDesc(score, lastClassifyResult.confidence ?? 0);
+
+  renderSources(lastSourcesResult);
+
+  checkBtn.disabled = false;
+  checkBtn.textContent = 'Quick Check';
+  deepCheckBtn.disabled = false;
+  deepCheckBtn.style.opacity = '1';
+}
+
+// ── Deep Analysis ─────────────────────────────────────────────
+async function runDeepAnalysis() {
+  if (!lastClassifyResult || !lastSourcesResult) return;
+
+  deepCheckBtn.disabled = true;
+  deepCheckBtn.style.opacity = '0.4';
+  deepCheckBtn.textContent = 'Analyzing…';
+  deepSection.classList.add('ta-hidden');
+
+  try {
+    const res = await fetch(`${API_BASE}/deep-analyse`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        text: lastText,
+        model_result: lastClassifyResult,
+        sources_result: lastSourcesResult,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error ${res.status}`);
+    }
+
+    renderDeepAnalysis(await res.json());
+
+  } catch (err) {
+    deepContent.innerHTML = `
+      <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;
+                  padding:14px;font-size:14px;color:#856404;">
+        ⚠️ Deep analysis failed: ${esc(err.message)}<br>
+        <small>Make sure LLM_API_KEY is set in your .env file.</small>
+      </div>`;
+    deepSection.classList.remove('ta-hidden');
+  }
+
+  deepCheckBtn.disabled = false;
+  deepCheckBtn.style.opacity = '1';
+  deepCheckBtn.textContent = '🔍 Deep Analysis';
+}
+
+// ── Event wiring ──────────────────────────────────────────────
+triggerBtn.onclick = () => {
+  overlay.classList.remove('ta-hidden');
+  modeMenu.classList.remove('ta-hidden');
+  mainModal.classList.add('ta-hidden');
+};
+
+document.querySelectorAll('.ta-close-x').forEach(btn => {
+  btn.onclick = () => {
+    overlay.classList.add('ta-hidden');
+    document.getElementById('ta-floating-confirm')?.remove();
+  };
+});
+
+btnAll.onclick = () => {
+  const allText = Array.from(
+    document.querySelectorAll('p, h1, h2, h3, article, section')
+  )
+    .map(el => el.innerText?.trim())
+    .filter(t => t && t.length > 20)
+    .join('\n\n')
+    .slice(0, 5000);
+
+  openMainModal(allText || 'No readable text found on this page.');
+};
+
+btnSelect.onclick = () => {
+  overlay.classList.add('ta-hidden');
+  const handleMouseUp = (e) => {
+    const selectedText = window.getSelection().toString().trim();
+    if (selectedText.length > 5) {
+      showFloatingButton(e.pageX, e.pageY, selectedText);
+      document.removeEventListener('mouseup', handleMouseUp);
+    }
+  };
+  document.addEventListener('mouseup', handleMouseUp);
+};
+
+function showFloatingButton(x, y, text) {
+  document.getElementById('ta-floating-confirm')?.remove();
+
+  const floatBtn = document.createElement('button');
+  floatBtn.id = 'ta-floating-confirm';
+  floatBtn.innerHTML = '✨ Verify Selection';
+
+  Object.assign(floatBtn.style, {
+    position:'absolute', top:(y+10)+'px', left:(x+10)+'px',
+    zIndex:'2147483647', background:'#5f0865', color:'white',
+    border:'none', padding:'8px 16px', borderRadius:'20px',
+    cursor:'pointer', fontWeight:'bold', fontSize:'13px',
+  });
+
+  document.body.appendChild(floatBtn);
+
+  floatBtn.onclick = () => {
+    openMainModal(text);
+    overlay.classList.remove('ta-hidden');
+    floatBtn.remove();
+  };
+}
+
+checkBtn.onclick     = () => runQuickCheck();
+deepCheckBtn.onclick = () => runDeepAnalysis();
