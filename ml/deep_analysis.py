@@ -28,14 +28,14 @@ LLM_MODEL = "openrouter/auto"
 def _format_sources(sources_result: dict) -> str:
     """Форматируем источники в читаемый текст для промта."""
     if sources_result.get("error") or not sources_result.get("sources"):
-        return "Источники не найдены."
+        return "Sources not found."
 
     lines = []
     for i, s in enumerate(sources_result["sources"], 1):
-        trust = "ДОВЕРЕННЫЙ" if s["trusted"] else "неизвестный"
+        trust = "TRUSTED" if s["trusted"] else "unknown"
         lines.append(f"{i}. [{trust}] {s['domain']} — {s['title']}")
         if s.get("snippet"):
-            lines.append(f"   Описание: {s['snippet'][:150]}...")
+            lines.append(f"   Description: {s['snippet'][:150]}...")
 
     return "\n".join(lines)
 
